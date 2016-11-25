@@ -96,6 +96,28 @@ If you are using RN < 0.30.0 and react-native-fcm < 1.0.16, pass intent into pac
 +   }       
 ```
 
+NOTE: Verify that react-native links correctly in `MainApplication.java`
+
+```diff
+import android.app.application
+...
++import com.evollu.react.fcm.FIRMessagingPackage;
+```
+....
+```diff
+    @Override
+    protected List<ReactPackage> getPackages() {
+      return Arrays.<ReactPackage>asList(
+          new MainReactPackage(),
+          new VectorIconsPackage(),
++         new FIRMessagingPackage(),
+          new RNDeviceInfo(),
+      );
+    }
+ ```   
+
+
+
 - RN <= 0.27:
 
 ```diff
