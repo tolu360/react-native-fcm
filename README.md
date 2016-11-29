@@ -172,12 +172,9 @@ Edit `AppDelegate.m`:
   {
   //...
 +   [FIRApp configure];
-+   #if defined(__IPHONE_10_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_10_0
 +   [[UNUserNotificationCenter currentNotificationCenter] setDelegate:self];
-+   #endif
-  }
-
-+ #if defined(__IPHONE_10_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_10_0
++ }
++
 + - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler
 + {
 +   [[NSNotificationCenter defaultCenter] postNotificationName:FCMNotificationReceived object:self userInfo:notification.request.content.userInfo];
@@ -186,21 +183,20 @@ Edit `AppDelegate.m`:
 +   }else{
 +     completionHandler(UNNotificationPresentationOptionNone);
 +   }
-
++
 + }
-
++
 + - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)())completionHandler
 + {
 +     NSDictionary* userInfo = [[NSMutableDictionary alloc] initWithDictionary: response.notification.request.content.userInfo];
 +   [userInfo setValue:@YES forKey:@"opened_from_tray"];
 +   [[NSNotificationCenter defaultCenter] postNotificationName:FCMNotificationReceived object:self userInfo:userInfo];
 + }
-+ #else
++
 + //You can skip this method if you don't want to use local notification
 + -(void)application:(UIApplication *)application didReceiveLocalNotification:(UILocalNotification *)notification {
 +   [[NSNotificationCenter defaultCenter] postNotificationName:FCMNotificationReceived object:self + userInfo:notification.userInfo];
 + }
-+ #endif
 + 
 + - (void)application:(UIApplication *)application didReceiveRemoteNotification:(nonnull NSDictionary *)userInfo fetchCompletionHandler:(nonnull void (^)(UIBackgroundFetchResult))completionHandler{
 +   [[NSNotificationCenter defaultCenter] postNotificationName:FCMNotificationReceived object:self userInfo:userInfo];
@@ -311,8 +307,8 @@ class App extends Component {
         FCM.getScheduledLocalNotifications().then(notif=>console.log(notif));
         FCM.cancelLocalNotification("UNIQ_ID_STRING");
         FCM.cancelAllLocalNotifications();
-        FCM.setBadgeNumber();
-        FCM.getBadgeNumber().then(number=>console.log(number));
+        FCM.setBadgeNumber();                                       // iOS only and there's no way to set it in Android, yet.
+        FCM.getBadgeNumber().then(number=>console.log(number));     // iOS only and there's no way to get it in Android, yet.
         FCM.send('984XXXXXXXXX', {
           my_custom_data_1: 'my_custom_field_value_1', 
           my_custom_data_2: 'my_custom_field_value_2'
