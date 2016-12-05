@@ -36,10 +36,12 @@ import java.util.UUID;
 public class FIRMessagingModule extends ReactContextBaseJavaModule implements LifecycleEventListener, ActivityEventListener {
     private final static String TAG = FIRMessagingModule.class.getCanonicalName();
     private FIRLocalMessagingHelper mFIRLocalMessagingHelper;
+    private BadgeHelper mBadgeHelper;
 
     public FIRMessagingModule(ReactApplicationContext reactContext) {
         super(reactContext);
         mFIRLocalMessagingHelper = new FIRLocalMessagingHelper((Application) reactContext.getApplicationContext());
+        mBadgeHelper = new BadgeHelper(reactContext.getApplicationContext());
         getReactApplicationContext().addLifecycleEventListener(this);
         getReactApplicationContext().addActivityEventListener(this);
         registerTokenRefreshHandler();
@@ -113,6 +115,16 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
         promise.resolve(array);
     }
 
+    @ReactMethod
+    public void setBadgeNumber(int badgeNumber) {
+        mBadgeHelper.setBadgeCount(badgeNumber);
+    }
+
+    @ReactMethod
+    public void getBadgeNumber(Promise promise) {
+       promise.resolve(mBadgeHelper.getBadgeCount());
+    }
+
     private void sendEvent(String eventName, Object params) {
         getReactApplicationContext()
             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
@@ -126,9 +138,7 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
             public void onReceive(Context context, Intent intent) {
                 if (getReactApplicationContext().hasActiveCatalystInstance()) {
                     String token = intent.getStringExtra("token");
-
                     sendEvent("FCMTokenRefreshed", token);
-                    abortBroadcast();
                 }
             }
         }, intentFilter);
@@ -196,7 +206,6 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
                     }
                 }
                 sendEvent("FCMNotificationReceived", params);
-                abortBroadcast();
 
             }
             }
@@ -211,7 +220,6 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
             public void onReceive(Context context, Intent intent) {
                 if (getReactApplicationContext().hasActiveCatalystInstance()) {
                     sendEvent("FCMNotificationReceived", Arguments.fromBundle(intent.getExtras()));
-                    abortBroadcast();
                 }
             }
         }, intentFilter);

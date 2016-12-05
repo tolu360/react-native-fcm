@@ -195,7 +195,7 @@ Edit `AppDelegate.m`:
 +
 + //You can skip this method if you don't want to use local notification
 + -(void)application:(UIApplication *)application didReceiveLocalNotification:(UILocalNotification *)notification {
-+   [[NSNotificationCenter defaultCenter] postNotificationName:FCMNotificationReceived object:self + userInfo:notification.userInfo];
++   [[NSNotificationCenter defaultCenter] postNotificationName:FCMNotificationReceived object:self userInfo:notification.userInfo];
 + }
 + 
 + - (void)application:(UIApplication *)application didReceiveRemoteNotification:(nonnull NSDictionary *)userInfo fetchCompletionHandler:(nonnull void (^)(UIBackgroundFetchResult))completionHandler{
@@ -285,7 +285,7 @@ class App extends Component {
             ticker: "My Notification Ticker",                   // Android only
             auto_cancel: true,                                  // Android only (default true)
             large_icon: "ic_launcher",                           // Android only
-            icon: "ic_notification",                            // as FCM payload
+            icon: "ic_launcher",                                // as FCM payload, you can relace this with custom icon you put in mipmap
             big_text: "Show when notification is expanded",     // Android only
             sub_text: "This is a subText",                      // Android only
             color: "red",                                       // Android only
