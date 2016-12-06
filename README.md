@@ -50,6 +50,17 @@
     ...
 ```
 
+- Edit `{YOUR_MAIN_PROJECT}/app/build.gradle`:
+```diff
+ dependencies {
+     compile project(':react-native-fcm')
++    compile 'com.google.firebase:firebase-core:10.0.1' //this decides your firebase SDK version
+     compile fileTree(dir: "libs", include: ["*.jar"])
+     compile "com.android.support:appcompat-v7:23.0.1"
+     compile "com.facebook.react:react-native:+"  // From node_modules
+ }
+```
+
 ### Config for notification and `click_action` in Android
 
 To allow android to respond to `click_action`, you need to define Activities and filter on specific intent. Since all javascript is running in MainActivity, you can have MainActivity to handle actions:
@@ -270,6 +281,7 @@ class App extends Component {
     }
  
     otherMethods(){
+        
         FCM.subscribeToTopic('/topics/foo-bar');
         FCM.unsubscribeFromTopic('/topics/foo-bar');
         FCM.getInitialNotification().then(notif=>console.log(notif));
@@ -305,8 +317,15 @@ class App extends Component {
         })
 
         FCM.getScheduledLocalNotifications().then(notif=>console.log(notif));
-        FCM.cancelLocalNotification("UNIQ_ID_STRING");
-        FCM.cancelAllLocalNotifications();
+        
+        //these clears notification from notification center/tray
+        FCM.removeAllDeliveredNotifications()
+        FCM.removeDeliveredNotification("UNIQ_ID_STRING")
+        
+        //these removes future local notifications
+        FCM.cancelAllLocalNotifications()
+        FCM.cancelLocalNotification("UNIQ_ID_STRING")
+        
         FCM.setBadgeNumber();                                       // iOS only and there's no way to set it in Android, yet.
         FCM.getBadgeNumber().then(number=>console.log(number));     // iOS only and there's no way to get it in Android, yet.
         FCM.send('984XXXXXXXXX', {
@@ -316,6 +335,32 @@ class App extends Component {
     }
 }
 ```
+
+### Build custom push notification for Andorid
+Firebase android misses important feature of android notification like `group`, `priority` and etc. As a work around you can send data message (no `notification` payload at all) and this repo will build a local notification for you. If you pass `custom_notification` in the payload, the repo will treat the content as a local notification config and shows immediately.
+
+NOTE: By using this work around, you will have to send different types of payload for iOS and Android devices.
+
+Example of payload that is sent to FCM server:
+```
+{
+  "to":"FCM_TOKEN",
+  "data": {
+    "type":"MEASURE_CHANGE",
+    "custom_notification": {
+	    "body": "test body",
+      "title": "test title",
+      "color":"#00ACD4",
+      "priority":"high",
+      "icon":"ic_notif",
+      "group": "GROUP",
+      "id": "id"
+    }
+  }
+}
+```
+
+Check local notification guide below for configuration.
 
 ### Behaviour when sending `notification` and `data` payload through GCM
 - When app is not running and user clicks notification, notification data will be passed into `FCM.getInitialNotification` event
