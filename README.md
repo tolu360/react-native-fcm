@@ -214,7 +214,12 @@ Edit `AppDelegate.m`:
 +   completionHandler(UIBackgroundFetchResultNoData);
 + }
 ```
-
+ 
+### Xcode post installation steps
+- Select your project **Capabilities** and enable **Keychan Sharing** and *Background Modes* > **Remote notifications**.
+ 
+- In Xcode menu bar, select *Product* > *Scheme* > **Manage schemes**. Select your project name Scheme then click on the minus sign **―** in the bottom left corner, then click on the plus sign **+** and rebuild your project scheme. 
+ 
 ### FCM config file
 
 In [firebase console](https://console.firebase.google.com/), you can get `google-services.json` file and place it in `android/app` directory and get `GoogleService-Info.plist` file and place it in `/ios/your-project-name` directory (next to your `Info.plist`)
@@ -326,7 +331,7 @@ class App extends Component {
         FCM.cancelAllLocalNotifications()
         FCM.cancelLocalNotification("UNIQ_ID_STRING")
 
-        FCM.setBadgeNumber();                                       // iOS only and there's no way to set it in Android, yet.
+        FCM.setBadgeNumber(1);                                       // iOS only and there's no way to set it in Android, yet.
         FCM.getBadgeNumber().then(number=>console.log(number));     // iOS only and there's no way to get it in Android, yet.
         FCM.send('984XXXXXXXXX', {
           my_custom_data_1: 'my_custom_field_value_1',
@@ -442,8 +447,8 @@ Try update your SDK and google play service
 #### My App throws FCM function undefined error
 There seems to be link issue with rnpm. Make sure that there is `new FIRMessagingPackage(),` in your `Application.java` file
 
-#### I can't get notification when app is killed
-If you send notification with `data` only, you can only get the data message when app is in foreground or background. Killed app doesn't trigger `FCMNotificationReceived`. Use `notification` in the payload instead.
+#### I can't get notification in iOS emulator
+Remote notification can't reach iOS emulator since it can't fetch APNS token. Use real device.
 
 #### App running in background doesn't trigger `FCMNotificationReceived` when receiving hybrid notification [Android]
 These is [an issue opened for that](https://github.com/google/gcm/issues/63). Behavior is not consistent between 2 platforms
@@ -498,6 +503,9 @@ It is up to you! FCM is just a bridging library that passes notification into ja
 #### I want to show notification when app is in foreground
 Use `show_in_foreground` attribute to tell app to show banner even if the app is in foreground.
 Warning: foreground banner won't show in android for remote notification due to limitation of FCM SDK. However you can create a local notification yourself. A pull is welcome to fix this.
+
+#### Do I need to handle APNS token registration?
+No. Method swizzling in Firebase Cloud Messaging handles this unless you turn that off. Then you are on your own to implement the handling. Check this link https://firebase.google.com/docs/cloud-messaging/ios/client
 
 #### Some features are missing
 Issues and pull requests are welcome. Let's make this thing better!
