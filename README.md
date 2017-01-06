@@ -1,10 +1,11 @@
 [![Join the chat at https://gitter.im/evollu/react-native-fcm](https://badges.gitter.im/evollu/react-native-fcm.svg)](https://gitter.im/evollu/react-native-fcm?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## NOTE:
-- If you are running RN < 0.30.0, you need to use react-native-fcm@1.0.15
-- If you are running RN < 0.33.0, you need to user react-native-fcm@1.1.0
-- Otherwise use latest v2 and use XCode 8 and latest Firebase SDK (iOS 3.6.0)
-- local notification is only available in V2
+- for latest RN, use v3
+- for RN < 0.40.0, use v2.5.6
+- for RN < 0.33.0, you need to user react-native-fcm@1.1.0
+- for RN < 0.30.0, you need to use react-native-fcm@1.0.15
+- local notification is not only available in V1
 
 - An example working project is available at: https://github.com/evollu/react-native-fcm/tree/master/Examples/simple-fcm-client
 
@@ -166,6 +167,9 @@ uncomment the "use_frameworks!" line in the podfile.
 2. Follow the `README` to link frameworks (Analytics+Messaging)
 
 ### Shared steps
+Make sure you have certificates setup by following
+https://firebase.google.com/docs/cloud-messaging/ios/certs
+
 Edit `AppDelegate.h`:
 ```diff
 + @import UserNotifications;
@@ -214,12 +218,12 @@ Edit `AppDelegate.m`:
 +   completionHandler(UIBackgroundFetchResultNoData);
 + }
 ```
- 
+
 ### Xcode post installation steps
 - Select your project **Capabilities** and enable **Keychan Sharing** and *Background Modes* > **Remote notifications**.
- 
-- In Xcode menu bar, select *Product* > *Scheme* > **Manage schemes**. Select your project name Scheme then click on the minus sign **―** in the bottom left corner, then click on the plus sign **+** and rebuild your project scheme. 
- 
+
+- In Xcode menu bar, select *Product* > *Scheme* > **Manage schemes**. Select your project name Scheme then click on the minus sign **―** in the bottom left corner, then click on the plus sign **+** and rebuild your project scheme.
+
 ### FCM config file
 
 In [firebase console](https://console.firebase.google.com/), you can get `google-services.json` file and place it in `android/app` directory and get `GoogleService-Info.plist` file and place it in `/ios/your-project-name` directory (next to your `Info.plist`)
@@ -264,7 +268,7 @@ class App extends Component {
             console.log(token)
             // store fcm token in your server
         });
-        this.notificationUnsubscribe = FCM.on('notification', (notif) => {
+        this.notificationListener = FCM.on('notification', (notif) => {
             // there are two parts of notif. notif.notification contains the notification payload, notif.data contains data payload
             if(notif.local_notification){
               //this is a local notification
@@ -273,16 +277,16 @@ class App extends Component {
               //app is open/resumed because user clicked banner
             }
         });
-        this.refreshUnsubscribe = FCM.on('refreshToken', (token) => {
+        this.refreshTokenListener = FCM.on('refreshToken', (token) => {
             console.log(token)
             // fcm token may not be available on first load, catch it here
         });
     }
 
     componentWillUnmount() {
-        // prevent leaking
-        this.refreshUnsubscribe();
-        this.notificationUnsubscribe();
+        // stop listening for events
+        this.notificationListener.remove();
+        this.refreshTokenListener.remove();
     }
 
     otherMethods(){
@@ -344,7 +348,7 @@ class App extends Component {
 ### Build custom push notification for Andorid
 Firebase android misses important feature of android notification like `group`, `priority` and etc. As a work around you can send data message (no `notification` payload at all) and this repo will build a local notification for you. If you pass `custom_notification` in the payload, the repo will treat the content as a local notification config and shows immediately.
 
-NOTE: By using this work around, you will have to send different types of payload for iOS and Android devices.
+NOTE: By using this work around, you will have to send different types of payload for iOS and Android devices because custom_notification isn't supported on iOS
 
 Example of payload that is sent to FCM server:
 ```
@@ -353,13 +357,14 @@ Example of payload that is sent to FCM server:
   "data": {
     "type":"MEASURE_CHANGE",
     "custom_notification": {
-	    "body": "test body",
+      "body": "test body",
       "title": "test title",
       "color":"#00ACD4",
       "priority":"high",
       "icon":"ic_notif",
       "group": "GROUP",
-      "id": "id"
+      "id": "id",
+      "show_in_foreground": true
     }
   }
 }
@@ -475,7 +480,7 @@ search for `compile "com.google.android.gms` in android and see who specifies sp
 Check open from tray flag in notification. It will be either 0 or 1 for iOS and undefined or 1 for android. I decide for iOS based on [this](http://stackoverflow.com/questions/20569201/remote-notification-method-called-twice), and for android I set it if notification is triggered by intent change.
 
 #### Android notification doesn't vibrate/show head-up display etc
-All available features are [here](https://firebase.google.com/docs/cloud-messaging/http-server-ref#notification-payload-support). FCM may add more support in the future but there is no timeline. 
+All available features are [here](https://firebase.google.com/docs/cloud-messaging/http-server-ref#notification-payload-support). FCM may add more support in the future but there is no timeline.
 In the mean time, you can pass "custom_notification" in a data message. This repo will show a local notification for you so you can set priority etc
 
 #### How do I do xxx with FCM?
@@ -502,7 +507,7 @@ It is up to you! FCM is just a bridging library that passes notification into ja
 
 #### I want to show notification when app is in foreground
 Use `show_in_foreground` attribute to tell app to show banner even if the app is in foreground.
-Warning: foreground banner won't show in android for remote notification due to limitation of FCM SDK. However you can create a local notification yourself. A pull is welcome to fix this.
+NOTE: this flag doesn't work for Android push notification, use `custom_notification` to achieve this.
 
 #### Do I need to handle APNS token registration?
 No. Method swizzling in Firebase Cloud Messaging handles this unless you turn that off. Then you are on your own to implement the handling. Check this link https://firebase.google.com/docs/cloud-messaging/ios/client
