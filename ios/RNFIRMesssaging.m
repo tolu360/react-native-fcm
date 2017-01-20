@@ -161,6 +161,7 @@ RCT_EXPORT_MODULE()
   // For iOS 10 data message (sent via FCM)
   dispatch_async(dispatch_get_main_queue(), ^{
     [[FIRMessaging messaging] setRemoteMessageDelegate:self];
+    [self connectToFCM];
   });
 }
 
@@ -287,7 +288,7 @@ RCT_EXPORT_METHOD(scheduleLocalNotification:(id)data resolver:(RCTPromiseResolve
   }
 }
 
-RCT_EXPORT_METHOD(removeDeliveredNotifications:(NSString*) notificationId)
+RCT_EXPORT_METHOD(removeDeliveredNotification:(NSString*) notificationId)
 {
   if([UNUserNotificationCenter currentNotificationCenter] != nil){
     [[UNUserNotificationCenter currentNotificationCenter] removeDeliveredNotificationsWithIdentifiers:@[notificationId]];
