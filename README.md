@@ -251,7 +251,7 @@ NOTE: `com.evollu.react.fcm.FIRLocalMessagingPublisher` is required for presenti
 ## Usage
 
 ```javascript
-import FCM, {FCMEvent, RemoteNotificationResult, WillPresentNotificationResult} from 'react-native-fcm';
+import FCM, {FCMEvent, RemoteNotificationResult, WillPresentNotificationResult, NotificationType} from 'react-native-fcm';
 
 class App extends Component {
     componentDidMount() {
@@ -356,7 +356,7 @@ class App extends Component {
 }
 ```
 
-### Build custom push notification for Andorid
+### Build custom push notification for Android
 Firebase android misses important feature of android notification like `group`, `priority` and etc. As a work around you can send data message (no `notification` payload at all) and this repo will build a local notification for you. If you pass `custom_notification` in the payload, the repo will treat the content as a local notification config and shows immediately.
 
 NOTE: By using this work around, you will have to send different types of payload for iOS and Android devices because custom_notification isn't supported on iOS
@@ -458,7 +458,19 @@ Yes there are `react-native-push-notification` and `react-native-system-notifica
 - The PushNotificationIOS by react native team is still missing features that recurring, so we are adding it here
 
 #### My Android build is failing
-Try update your SDK and google play service
+Try update your SDK and google play service. If you are having multiple plugins requiring different version of play-service sdk, use force to lock in version
+```
+dependencies {
+    ...
+    compile ('com.android.support:appcompat-v7:25.0.1') {
+        exclude group: 'com.google.android', module: 'support-v4'
+    }
+    compile ('com.google.android.gms:play-services-gcm:10.0.1') {
+        force = true;
+    }
+   ...
+}
+```
 
 #### My App throws FCM function undefined error
 There seems to be link issue with rnpm. Make sure that there is `new FIRMessagingPackage(),` in your `Application.java` file
