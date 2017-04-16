@@ -159,7 +159,6 @@ Install the `Firebase/Messaging` pod:
 cd ios && pod init
 pod install Firebase/Messaging
 ```
-uncomment the "use_frameworks!" line in the podfile.
 
 ### Non Cocoapod approach
 
@@ -189,7 +188,10 @@ Edit `AppDelegate.m`:
   //...
 +   [FIRApp configure];
 +   [[UNUserNotificationCenter currentNotificationCenter] setDelegate:self];
-+ }
+
+    return YES;
+ }
+ 
 +
 + - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler
 + {
@@ -212,7 +214,10 @@ Edit `AppDelegate.m`:
 ```
 
 ### Xcode post installation steps
-- Select your project **Capabilities** and enable **Keychan Sharing** and *Background Modes* > **Remote notifications**.
+- Select your project **Capabilities** and enable:
+  - **Push Notifications**
+  - **Keychain Sharing** 
+  - *Background Modes* > **Remote notifications**.
 
 - In Xcode menu bar, select *Product* > *Scheme* > **Manage schemes**. Select your project name Scheme then click on the minus sign **―** in the bottom left corner, then click on the plus sign **+** and rebuild your project scheme.
 
