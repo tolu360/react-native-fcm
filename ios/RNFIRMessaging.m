@@ -1,12 +1,9 @@
 #import "RNFIRMessaging.h"
 
 #import <React/RCTConvert.h>
-#import <React/RCTEventDispatcher.h>
 #import <React/RCTUtils.h>
 
 @import UserNotifications;
-#import <FirebaseMessaging/FirebaseMessaging.h>
-#import <FirebaseInstanceID/FirebaseInstanceID.h>
 
 #if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_8_0
 
@@ -19,6 +16,8 @@
 #endif
 
 NSString *const FCMNotificationReceived = @"FCMNotificationReceived";
+NSString *const FCMTokenRefreshed = @"FCMTokenRefreshed";
+NSString *const FCMDirectChannelConnectionChanged = @"FCMDirectChannelConnectionChanged";
 
 @implementation RCTConvert (NSCalendarUnit)
 
@@ -134,9 +133,12 @@ RCT_ENUM_CONVERTER(UNNotificationPresentationOptions, (@{
 
 @implementation RNFIRMessaging
 
-RCT_EXPORT_MODULE()
-
 @synthesize bridge = _bridge;
+RCT_EXPORT_MODULE();
+
+- (NSArray<NSString *> *)supportedEvents {
+  return @[FCMNotificationReceived, FCMTokenRefreshed, FCMDirectChannelConnectionChanged];
+}
 
 + (void)didReceiveRemoteNotification:(nonnull NSDictionary *)userInfo fetchCompletionHandler:(nonnull RCTRemoteNotificationCallback)completionHandler {
   NSMutableDictionary* data = [[NSMutableDictionary alloc] initWithDictionary: userInfo];
@@ -174,27 +176,12 @@ RCT_EXPORT_MODULE()
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (void)setBridge:(RCTBridge *)bridge
-{
-  _bridge = bridge;
-  
+- (instancetype)init {
+  self = [super init];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(handleNotificationReceived:)
                                                name:FCMNotificationReceived
                                              object:nil];
-  
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(disconnectFCM)
-                                               name:UIApplicationDidEnterBackgroundNotification
-                                             object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(connectToFCM)
-                                               name:UIApplicationDidBecomeActiveNotification
-                                             object:nil];
-  
-  [[NSNotificationCenter defaultCenter]
-   addObserver:self selector:@selector(onTokenRefresh)
-   name:kFIRInstanceIDTokenRefreshNotification object:nil];
   
   [[NSNotificationCenter defaultCenter]
    addObserver:self selector:@selector(sendDataMessageFailure:)
@@ -204,50 +191,52 @@ RCT_EXPORT_MODULE()
    addObserver:self selector:@selector(sendDataMessageSuccess:)
    name:FIRMessagingSendSuccessNotification object:nil];
   
+  [[NSNotificationCenter defaultCenter]
+   addObserver:self selector:@selector(connectionStateChanged:)
+   name:FIRMessagingConnectionStateChangedNotification object:nil];
+  
   // For iOS 10 data message (sent via FCM)
   dispatch_async(dispatch_get_main_queue(), ^{
-    [[FIRMessaging messaging] setRemoteMessageDelegate:self];
-    [self connectToFCM];
+    [[FIRMessaging messaging] setDelegate:self];
   });
+  return self;
 }
 
-- (void)connectToFCM
+RCT_EXPORT_METHOD(enableDirectChannel)
 {
-  [[FIRMessaging messaging] connectWithCompletion:^(NSError * _Nullable error) {
-    if (error != nil) {
-      NSLog(@"Unable to connect to FCM. %@", error);
-    } else {
-      NSLog(@"Connected to FCM.");
-    }
-  }];
+  [[FIRMessaging messaging] setShouldEstablishDirectChannel:@YES];
 }
 
-- (void)disconnectFCM
+RCT_EXPORT_METHOD(isDirectChannelEstablished:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 {
-  [[FIRMessaging messaging] disconnect];
-  NSLog(@"Disconnected from FCM");
+  resolve([[FIRMessaging messaging] isDirectChannelEstablished] ? @YES: @NO);
 }
 
-RCT_EXPORT_METHOD(getInitialNotification:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject){
+RCT_EXPORT_METHOD(getInitialNotification:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
+{
   UILocalNotification *localUserInfo = _bridge.launchOptions[UIApplicationLaunchOptionsLocalNotificationKey];
   if (localUserInfo) {
     resolve([[localUserInfo userInfo] copy]);
-    return;
+  } else {
+    resolve([_bridge.launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey] copy]);
   }
-  resolve([_bridge.launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey] copy]);
+}
+
+RCT_EXPORT_METHOD(getAPNSToken:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
+{
+  resolve([FIRMessaging messaging].APNSToken);
 }
 
 RCT_EXPORT_METHOD(getFCMToken:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 {
-  resolve([[FIRInstanceID instanceID] token]);
+  resolve([FIRMessaging messaging].FCMToken);
 }
 
-- (void) onTokenRefresh
-{
-  [_bridge.eventDispatcher sendDeviceEventWithName:@"FCMTokenRefreshed" body:[[FIRInstanceID instanceID] token]];
+- (void)messaging:(nonnull FIRMessaging *)messaging didRefreshRegistrationToken:(nonnull NSString *)fcmToken {
+  [self sendEventWithName:FCMTokenRefreshed body:fcmToken];
 }
 
-RCT_EXPORT_METHOD(requestPermissions)
+RCT_EXPORT_METHOD(requestPermissions:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 {
   if (RCTRunningInAppExtension()) {
     return;
@@ -261,9 +250,6 @@ RCT_EXPORT_METHOD(requestPermissions)
       UIUserNotificationSettings *notificationSettings =
       [UIUserNotificationSettings settingsForTypes:(NSUInteger)allNotificationTypes categories:nil];
       [app registerUserNotificationSettings:notificationSettings];
-    } else {
-      //iOS 7 or below
-      [app registerForRemoteNotificationTypes:(NSUInteger)allNotificationTypes];
     }
   } else {
     // iOS 10 or later
@@ -275,6 +261,11 @@ RCT_EXPORT_METHOD(requestPermissions)
     [[UNUserNotificationCenter currentNotificationCenter]
      requestAuthorizationWithOptions:authOptions
      completionHandler:^(BOOL granted, NSError * _Nullable error) {
+       if(granted){
+         resolve(nil);
+       } else{
+         reject(@"notification_error", @"Failed to grand permission", error);
+       }
      }
      ];
 #endif
@@ -295,7 +286,7 @@ RCT_EXPORT_METHOD(unsubscribeFromTopic: (NSString*) topic)
 
 // Receive data message on iOS 10 devices.
 - (void)applicationReceivedRemoteMessage:(FIRMessagingRemoteMessage *)remoteMessage {
-  [_bridge.eventDispatcher sendDeviceEventWithName:FCMNotificationReceived body:[remoteMessage appData]];
+  [self sendEventWithName:FCMNotificationReceived body:[remoteMessage appData]];
 }
 
 RCT_EXPORT_METHOD(presentLocalNotification:(id)data resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
@@ -379,8 +370,7 @@ RCT_EXPORT_METHOD(getScheduledLocalNotifications:(RCTPromiseResolveBlock)resolve
     [[UNUserNotificationCenter currentNotificationCenter] getPendingNotificationRequestsWithCompletionHandler:^(NSArray<UNNotificationRequest *> * _Nonnull requests) {
       NSMutableArray* list = [[NSMutableArray alloc] init];
       for(UNNotificationRequest * notif in requests){
-        NSString* interval;
-        UNMutableNotificationContent *content = notif.content;
+        UNNotificationContent *content = notif.content;
         [list addObject:content.userInfo];
       }
       resolve(list);
@@ -396,7 +386,7 @@ RCT_EXPORT_METHOD(getScheduledLocalNotifications:(RCTPromiseResolveBlock)resolve
 
 RCT_EXPORT_METHOD(setBadgeNumber: (NSInteger*) number)
 {
-  [RCTSharedApplication() setApplicationIconBadgeNumber:number];
+  [RCTSharedApplication() setApplicationIconBadgeNumber:*number];
 }
 
 RCT_EXPORT_METHOD(getBadgeNumber: (RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
@@ -467,7 +457,7 @@ RCT_EXPORT_METHOD(finishNotificationResponse: (NSString *)completionHandlerId){
     data[@"_completionHandlerId"] = completionHandlerId;
   }
   
-  [_bridge.eventDispatcher sendDeviceEventWithName:FCMNotificationReceived body:data];
+  [self sendEventWithName:FCMNotificationReceived body:data];
   
 }
 
@@ -483,6 +473,12 @@ RCT_EXPORT_METHOD(finishNotificationResponse: (NSString *)completionHandlerId){
   NSString *messageID = (NSString *)notification.userInfo[@"messageID"];
   
   NSLog(@"sendDataMessageSuccess: %@", messageID);
+}
+
+- (void)connectionStateChanged:(NSNotification *)notification
+{
+  [self sendEventWithName:FCMDirectChannelConnectionChanged body:[FIRMessaging messaging].isDirectChannelEstablished ? @YES: @NO];
+  NSLog(@"connectionStateChanged: %@", [FIRMessaging messaging].isDirectChannelEstablished ? @"connected": @"disconnected");
 }
 
 @end
